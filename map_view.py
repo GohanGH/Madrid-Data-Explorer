@@ -29,7 +29,10 @@ SELECTION = "mde_selected_codes"
 def value_text(value, unit, *, decimals=2):
     if pd.isna(value):
         return "Sin datos"
-    number = f"{value:,.{decimals}f}".rstrip("0").rstrip(".").translate(str.maketrans(",.", ".,"))
+    number = f"{value:,.{decimals}f}"
+    if decimals > 0:
+        number = number.rstrip("0").rstrip(".")
+    number = number.translate(str.maketrans(",.", ".,"))
     return f"{number} {unit}".strip()
 
 

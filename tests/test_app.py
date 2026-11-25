@@ -56,11 +56,19 @@ def test_ui_combine_three_and_analyze():
 
 @pytest.mark.parametrize("demo", DEMO_NAMES)
 def test_ui_demo(demo):
-    app = AppTest.from_file("app.py", default_timeout=20).run()
-    app.selectbox[0].set_value(demo).run()
-    app.checkbox[0].set_value(True).run()
+    app = AppTest.from_file("app.py", default_timeout=60).run()
+    app.button(key=f"open_{DEMO_NAMES.index(demo)}").click().run()
     assert not app.exception
     assert app.get("plotly_chart")
+    assert len(app.get("download_button")) == 6
+    index = DEMO_NAMES.index(demo)
+    view = "Mapa municipal" if index == 1 else "Mapa Y"
+    app.radio(key=f"demo_{index}_figure").set_value(view).run()
+    assert not app.exception
+    assert app.get("plotly_chart")
+    app.button(key=f"demo_{index}_store").click().run()
+    assert not app.exception
+    assert len(app.session_state.tables) == 1
 
 
 def test_ui_catalog_selection(monkeypatch):

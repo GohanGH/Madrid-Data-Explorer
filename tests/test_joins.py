@@ -32,7 +32,7 @@ def test_successive_joins_with_key_and_column_collisions(how):
                            "valor": [1, 2], "valor_B": [3, 4], "_merge": ["x", "y"],
                            "__join_key": ["original", "original"]})
     result = source
-    for _ in range(3):
+    for _ in range(4):
         result, info = join_preview(result, source, ["municipio", "año"], ["municipio", "año"], how)
         assert info["cardinalidad"] == "uno a uno"
         assert result.columns.is_unique
@@ -50,15 +50,28 @@ def test_empty_and_missing_columns():
         join_preview(left, right, ["bad"], ["id"], "inner")
 
 
-def test_many_to_many_reports_input_matches_and_result_rows():
+def test_many_to_many_is_blocked_and_one_to_many_reports_losses():
     a = pd.DataFrame({"id": ["a", "a", "b", None]})
     b = pd.DataFrame({"id": ["A", "A", "c", None]})
-    joined, info = join_preview(a, b, ["id"], ["id"], "inner")
-    assert len(joined) == 4
-    assert info["solo_izquierda"] == info["solo_derecha"] == 2
+    with pytest.raises(ValueError, match="muchos a muchos"):
+        join_preview(a, b, ["id"], ["id"], "inner")
+    joined, info = join_preview(a, b.drop_duplicates(), ["id"], ["id"], "inner")
+    assert len(joined) == 2
+    assert info["filas_A_perdidas"] == info["filas_B_perdidas"] == 2
     assert info["coincidencia_A_pct"] == 50
-    assert info["cardinalidad"] == "muchos a muchos"
+    assert info["cardinalidad"] == "muchos a uno"
     assert info["advertencias"]
+
+
+def test_join_normalizes_madrid_codes_and_years_through_outer_chain():
+    a = pd.DataFrame({"Código territorio": ["0014"], "Año": ["2024.0"]})
+    b = pd.DataFrame({"INE": ["28001", "28002"], "year": [2024, 2025]})
+    merged, info = join_preview(a, b, ["Código territorio", "Año"], ["INE", "year"], "outer")
+    assert len(merged) == 2
+    assert info["años"] == {"comunes": ["2024"], "solo_A": [], "solo_B": ["2025"]}
+    another, _ = join_preview(merged, b, ["Código territorio", "Año"], ["INE", "year"], "inner")
+    assert len(another) == 2
+    assert set(another["Código territorio"]) == {"0014", "28002"}
 
 
 def test_outer_join_retains_reusable_codes_and_years():

@@ -2,13 +2,15 @@
 import json
 import re
 from functools import lru_cache
+from pathlib import Path
 
 import pandas as pd
 
 from data_tables import read_table
-from demos import AGE, DATA, DEMO_NAMES, demo_table
 from discovery import fold
 
+DATA = Path(__file__).resolve().parent / "demo_data"
+AGE = "grado_envejecimiento_por_edad"
 RENT = "irpf_indicador_renta"
 JOBS = "302038"
 POP = "padron_por_sexo"
@@ -54,7 +56,7 @@ def normalize_code(value, system="INE"):
     if re.fullmatch(r"\d+\.0", raw):
         raw = raw[:-2]
     codes = official_codes()
-    if system == "Almudena":
+    if system == "Almudena" or (system == "auto" and raw.isdigit() and len(raw) <= 4):
         raw = raw.zfill(4)
         ine = "28" + raw[:3]
         return ine if ine in codes and codes[ine][0] == raw else None
@@ -130,5 +132,7 @@ def growth(frame, years):
 
 
 def verified_relationship():
+    from demos import DEMO_NAMES, demo_table
+
     frame, info = demo_table(DEMO_NAMES[0])
     return frame.dropna(subset=list(frame.columns[3:])), info

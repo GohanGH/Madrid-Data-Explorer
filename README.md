@@ -19,7 +19,7 @@ En **Analizar → Estudio estadístico**, cada tabla tiene un diagnóstico, un i
 
 ## Ejecutar en macOS o Linux
 
-Usa Python 3.11 para reproducir la configuración de CI y Community Cloud. El entorno local también admite Python 3.10.
+Usa Python 3.11 para reproducir la configuración de CI y Community Cloud. Si ya tienes un entorno virtual de otra versión, crea uno nuevo y ajusta la ruta de activación.
 
 ```bash
 python3.11 -m venv .venv
@@ -34,22 +34,39 @@ La aplicación abre en `http://localhost:8501`. La búsqueda oficial requiere In
 
 1. En **Catálogo**, busca por tema, revisa los metadatos y selecciona uno o varios recursos. Después de la primera búsqueda aparecen los filtros ofrecidos por CKAN. También puedes importar CSV, TSV, XLSX, XLS o JSON tabular.
 2. En **Analizar → Preparar y combinar tablas**, revisa las primeras 100 filas, los valores faltantes y los duplicados. Puedes convertir números y fechas, normalizar nombres y categorías, o quitar duplicados mediante una transformación confirmada.
-3. En **Combinar tablas**, elige claves equivalentes en el mismo orden. Para datos municipales longitudinales, usa código municipal y periodo si ambos son comparables. Previsualiza, revisa coincidencias y cardinalidad, y confirma para guardar. Puedes cruzar el resultado con más tablas o deshacer la última operación.
+3. En **Combinar tablas**, elige claves equivalentes en el mismo orden. Para datos municipales longitudinales, usa código municipal y periodo si ambos son comparables. Previsualiza, revisa coincidencias y cardinalidad, y confirma para guardar. Las claves reconocidas de Madrid se comparan en formato INE y se muestran los años comunes y las filas perdidas de cada fuente. Las uniones muchos a muchos que multiplicarían filas se bloquean. Puedes encadenar cruces y deshacer la última operación. En **Construir indicador**, guarda una versión nueva con un cociente escalado.
 4. En **Analizar → Resultados y gráficos**, selecciona una operación manual o formula una pregunta si la IA está configurada. Los resultados incluyen estadísticas, gráficos cuando corresponden, CSV y un JSON de metodología. Para capas alternativas se puede aportar un GeoJSON municipal WGS84.
 
-## Demostraciones
+## Estudios de ejemplo
 
-Los ejemplos de economía y mercado laboral se pueden abrir en Explorar. La colección original, que incluye el cruce sanitario, está en **Más demostraciones** antes de iniciar una búsqueda. Los extractos se obtuvieron el 18 de noviembre de 2026 y conservan los códigos de territorio publicados, de cuatro cifras con dígito de control. Para regenerarlos desde los datos oficiales, ejecuta `python demo_data/build.py`. La publicación de origen puede actualizar valores históricos.
+En **Explorar → Estudios de ejemplo**, pulsa **Abrir estudio**. Los tres estudios usan datos oficiales y se ejecutan sin claves ni conexión después de instalar la aplicación.
 
-| Ejemplo | Selección y análisis | Fuentes oficiales |
-| --- | --- | --- |
-| Economía y demografía | Municipios en 2024. Renta disponible bruta per cápita y porcentaje de población de 65 años y más. Cruce por código y año, dispersión y Pearson sobre pares completos. | [Renta municipal](https://datos.comunidad.madrid/dataset/irpf_indicador_renta), [Envejecimiento](https://datos.comunidad.madrid/dataset/grado_envejecimiento_por_edad) |
-| Mercado laboral | Municipios en 2018–2025. Serie de paro registrado y variación entre los extremos en personas. Una fila por código y año. Los recuentos dependen del tamaño municipal. | [Paro registrado](https://datos.comunidad.madrid/dataset/302038) |
-| Salud y territorio | Municipios en 2024. Población de 65 años y más frente a consultorios locales y centros de salud por 10.000 habitantes. Cruce por código y año, dispersión y Pearson. La tasa puede ser elevada en municipios pequeños y no mide accesibilidad. | [Centros sanitarios](https://datos.comunidad.madrid/dataset/centros_sanitarios_por_tipo), [Envejecimiento](https://datos.comunidad.madrid/dataset/grado_envejecimiento_por_edad) |
+| Estudio | Análisis inicial |
+| --- | --- |
+| Envejecimiento y centros sanitarios | Censo, recuentos de atención primaria y padrón de 2024. Calcula ambos indicadores, cruza por municipio y año y ejecuta Pearson y Spearman. |
+| Evolución del desempleo | Recuentos municipales a 31 de marzo de 2018–2025. Compara series, recuentos y cambios absolutos y porcentuales. |
+| Renta y envejecimiento | Renta disponible bruta por habitante y porcentaje censal de población de 65 años y más en 2024. Calcula Pearson, Spearman y OLS lineal con intervalos HC3. |
 
-En los extractos, el cruce de renta obtuvo r = −0,109 y el sanitario r = 0,601, ambos con 179 municipios. Entre 2018 y 2025 se registraron 3.349 personas menos en Alcalá de Henares, 2.768 menos en Alcorcón y 4.323 menos en Móstoles.
+En **Resultados**, cambia los filtros o métodos y usa **Vista** para alternar entre los gráficos y mapas. En **Datos y preparación**, abre las fuentes, el diagnóstico, la limpieza y la auditoría de uniones. En **Descargas**, guarda los datos y el informe o incorpora la tabla combinada a **Analizar**. El informe HTML incrusta los gráficos y mapas. Ábrelo en el navegador para guardarlo como PDF con el diálogo de impresión.
 
-Los dos cruces son descriptivos, sin ponderación de población ni ajuste por variables de confusión. Los valores de renta protegidos por secreto estadístico se conservan como faltantes. Las atribuciones y archivos originales figuran en [demo_data/sources.json](demo_data/sources.json).
+### Recorrido de 90 segundos ante el jurado
+
+1. **0–15 s.** Abre **Envejecimiento y centros sanitarios**. Muestra el resultado de Pearson y la dispersión.
+2. **15–40 s.** En **Datos y preparación**, abre **Datos y fuentes** y **Unión**. Señala el padrón, el recuento, el censo y el cruce por INE y año.
+3. **40–65 s.** Vuelve a **Resultados** y elige **Mapa Y** para mostrar los centros por 10.000 habitantes. Selecciona municipios si quieres comparar sus valores.
+4. **65–90 s.** Abre **Descargas** y descarga el informe HTML. Los mismos controles están disponibles en los estudios de paro registrado y renta.
+
+### Reproducir el corte oficial
+
+Los extractos de `demo_data/` son el corte que usa la aplicación. Conservan los códigos publicados con sus ceros iniciales. Las fuentes tabulares se verificaron el 25 de noviembre de 2026. Las geometrías se obtuvieron del WFS del IGN el 18 de noviembre de 2026. Los mapas de los estudios se dibujan con la capa local y sin un mapa base remoto. [Resultados, referencias y limitaciones](RESULTADOS_DATAMAD.md) · [Metadatos de las fuentes](demo_data/sources.json)
+
+Para comparar el corte con una descarga oficial posterior, genera extractos en otra carpeta.
+
+```bash
+python demo_data/build.py --output nuevos-extractos --save-raw csv-originales
+```
+
+Para regenerar desde descargas conservadas, usa `--local carpeta-csv` en lugar de `--save-raw`. Usa `mde-<clave>.csv` con las claves de `demo_data/sources.json` y `mde-paro.csv` para la serie de paro. Para reconstruir la geometría, `python demo_data/build_geometry.py` acepta las páginas GeoJSON del servicio WFS y valida que haya 179 municipios.
 
 ## IA opcional
 

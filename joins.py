@@ -34,8 +34,22 @@ def _key_part(values):
     return values.astype("string").str.normalize("NFC").str.strip().str.casefold()
 
 
-def _keys(frame, columns, side):
-    parts = [_key_part(frame[c]) for c in columns]
+def _year_part(values):
+    years = pd.to_numeric(values, errors="coerce")
+    return years.where(years.between(1, 9999) & years.mod(1).eq(0)).astype("Int64").astype("string")
+
+
+def _keys(frame, columns, side, roles):
+    parts = []
+    for column, role in zip(columns, roles):
+        part = _key_part(frame[column])
+        if role == "Código municipal":
+            from territories import normalize_code
+
+            part = part.map(lambda value: normalize_code(value, "auto")).astype("string").fillna(part)
+        elif role == "Año":
+            part = _year_part(frame[column])
+        parts.append(part)
     keys = zip(*(part.fillna("") for part in parts))
     return pd.Series([(side, i) if "" in key else ("valid", *key)
                       for i, key in enumerate(keys)], dtype=object)
@@ -49,9 +63,14 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
         raise ValueError("Selecciona claves existentes, distintas y en el mismo orden.")
     if how not in {"inner", "left", "right", "outer"}:
         raise ValueError("Tipo de unión no permitido.")
-    a, b = _keys(left, left_key, "A"), _keys(right, right_key, "B")
+    paired_roles = [(key_role(x), key_role(y)) for x, y in zip(left_key, right_key)]
+    roles = [x if x == y else None for x, y in paired_roles]
+    a, b = _keys(left, left_key, "A", roles), _keys(right, right_key, "B", roles)
     ac, bc = a.value_counts(), b.value_counts()
     shared = ac.index.intersection(bc.index)
+    if ((ac.reindex(shared) > 1) & (bc.reindex(shared) > 1)).any():
+        raise ValueError("Unión muchos a muchos: la misma clave se repite en ambas tablas. "
+                         "Añade periodo o categoría a la clave, o resuelve los duplicados.")
     matched = sum(int(ac[k]) * int(bc[k]) for k in shared)
     only_a, only_b = int((~a.isin(shared)).sum()), int((~b.isin(shared)).sum())
     estimate = matched + (only_a if how in {"left", "outer"} else 0) + (
@@ -63,9 +82,16 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
     warnings = []
     if not matched:
         warnings.append("Las claves seleccionadas carecen de coincidencias.")
-    if (ac.reindex(shared) > 1).any() and (bc.reindex(shared) > 1).any():
-        warnings.append("Hay duplicados a ambos lados. Revisa el nivel de detalle y la multiplicación de filas.")
-    paired_roles = [(key_role(x), key_role(y)) for x, y in zip(left_key, right_key)]
+    if dup_a or dup_b:
+        warnings.append("Hay claves repetidas. Revisa el nivel de detalle antes de interpretar el resultado.")
+    years = None
+    for (left_column, right_column), role in zip(zip(left_key, right_key), roles):
+        if role == "Año":
+            left_years = set(_year_part(left[left_column]).dropna())
+            right_years = set(_year_part(right[right_column]).dropna())
+            years = {"comunes": sorted(left_years & right_years), "solo_A": sorted(left_years - right_years),
+                     "solo_B": sorted(right_years - left_years)}
+            break
     if any(x != y and x and y for x, y in paired_roles):
         warnings.append("Algunas claves tienen funciones geográficas o temporales distintas.")
     if (any(key_role(c) in {"Año", "Fecha"} for c in [*left, *right])
@@ -81,19 +107,20 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
         occupied.add(name)
         return name
 
-    shared_keys = {b_col for a_col, b_col in zip(left_key, right_key) if a_col == b_col}
     rename = {c: unique(f"{c}_B") for c in right if c in left}
     internal = unique("__join_key")
     merged = left.reset_index(drop=True).assign(**{internal: a}).merge(
         right.rename(columns=rename).reset_index(drop=True).assign(**{internal: b}), on=internal, how=how
     ).drop(columns=internal)
-    for column in shared_keys:
+    for column, right_column in zip(left_key, right_key):
         # A synthetic match key treats blank values as missing, but retains original data.
-        first, second = merged[column], merged[rename[column]]
+        second_name = rename.get(right_column, right_column)
+        first, second = merged[column], merged[second_name]
         if first.dtype != second.dtype:
             first, second = first.astype(object), second.astype(object)
         merged[column] = first.combine_first(second)
-        merged = merged.drop(columns=rename[column])
+        if column == right_column:
+            merged = merged.drop(columns=second_name)
     return merged, {
         "claves": list(zip(left_key, right_key)), "filas_A": len(left), "filas_B": len(right),
         "filas": len(merged), "filas_coincidentes": matched, "solo_izquierda": only_a,
@@ -103,5 +130,8 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
         "claves_nulas_A": sum(key[0] == "A" for key in a),
         "claves_nulas_B": sum(key[0] == "B" for key in b),
         "cardinalidad": f"{'muchos' if dup_a else 'uno'} a {'muchos' if dup_b else 'uno'}",
+        "años": years,
+        "filas_A_perdidas": only_a if how in {"inner", "right"} else 0,
+        "filas_B_perdidas": only_b if how in {"inner", "left"} else 0,
         "advertencias": warnings,
     }

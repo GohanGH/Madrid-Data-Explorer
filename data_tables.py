@@ -2,6 +2,7 @@
 import csv
 import io
 import json
+import math
 import zipfile
 
 import pandas as pd
@@ -121,6 +122,20 @@ def transform(df, operation, column=None, *, decimal_comma=False, date_format="%
         raise ValueError("Transformación desconocida.")
     invalid = int((values.notna() & updated.isna()).sum())
     return df.assign(**{column: updated}), invalid
+
+
+def ratio_indicator(df, name, numerator, denominator, scale):
+    from statistical_engine import numeric_values
+
+    name = name.strip()
+    if not name or name in df or numerator == denominator:
+        raise ValueError("Introduce un nombre nuevo y elige dos variables distintas.")
+    if not math.isfinite(scale) or scale <= 0:
+        raise ValueError("La escala debe ser positiva y finita.")
+    top = numeric_values(df[numerator])
+    bottom = numeric_values(df[denominator])
+    indicator = numeric_values(scale * (top / bottom.where(bottom.gt(0))))
+    return df.assign(**{name: indicator}), int(indicator.isna().sum())
 
 
 def csv_export(df):

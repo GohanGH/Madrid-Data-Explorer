@@ -16,6 +16,8 @@ def html_report(title, summary, table, metadata, figures=(), notes=(), sections=
 <title>{escape(title)}</title>
 <style>body{{font:16px system-ui;background:#0D1117;color:#F0F3F6;margin:auto;max-width:76rem;padding:1rem}}
 table{{border-collapse:collapse}}th,td{{border:1px solid #303A46;padding:.35rem}}
-pre{{white-space:pre-wrap;overflow-wrap:anywhere}}.table{{overflow:auto}}</style>
+pre{{white-space:pre-wrap;overflow-wrap:anywhere}}.table{{overflow:auto}}
+@media print{{body{{background:#fff;color:#000}}thead{{display:table-header-group}}
+tr{{break-inside:avoid}}.plotly-graph-div{{break-inside:avoid}}}}</style>
 <h1>{escape(title)}</h1><p>{escape(summary)}</p><ul>{content}</ul>
 {charts}<div class="table">{table_html}</div>{details}<h2>Procedencia y parámetros</h2><pre>{method}</pre></html>"""

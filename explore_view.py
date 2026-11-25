@@ -368,6 +368,11 @@ def example_buttons():
 
 
 def question_screen(store):
+    from demos import show_demos
+
+    if st.session_state.get("open_demo"):
+        show_demos(store)
+        return
     question = st.session_state.get("question", "")
     if not question:
         st.html("""
@@ -394,6 +399,7 @@ def question_screen(store):
                               icon=":material/search:", on_click=on_submit)
 
     if not question:
+        show_demos(store)
         st.subheader("Explora por tema")
         with st.container(horizontal=True, gap="small", key="mde_topics"):
             for label, icon, prompt in TOPIC_CARDS:
@@ -403,10 +409,6 @@ def question_screen(store):
         with st.container(horizontal=True, gap="small"):
             st.button("Explorar el mapa", icon=":material/map:", on_click=navigate, args=("Mapa",))
             st.button("Abrir catálogo oficial", icon=":material/folder_open:", on_click=navigate, args=("Catálogo",))
-        with st.expander("Más demostraciones"):
-            from demos import show_demos
-
-            show_demos(store)
         return
 
     names = [name for _, name in official_codes().values()]

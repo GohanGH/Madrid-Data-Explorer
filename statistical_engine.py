@@ -112,8 +112,12 @@ def association(df, test, x, y):
     answer = method(clean[x], clean[y])
     direction = "positiva" if answer.statistic > 0 else "negativa" if answer.statistic < 0 else "nula"
     label = "lineal" if test == "Pearson" else "monótona de rangos"
-    return Result(pd.DataFrame({"Método": [test], "Coeficiente": [answer.statistic], "p": [answer.pvalue],
-                                "Observaciones": [len(clean)]}),
+    table = {"Método": [test], "Coeficiente": [answer.statistic], "p": [answer.pvalue],
+             "Observaciones": [len(clean)]}
+    if test == "Pearson" and len(clean) >= 4:
+        interval = answer.confidence_interval()
+        table.update({"IC 95 % inferior": [interval.low], "IC 95 % superior": [interval.high]})
+    return Result(pd.DataFrame(table),
                   f"La asociación {label} es {direction}, con coeficiente {answer.statistic:.3f}. No implica causalidad.",
                   [case_note(len(clean), len(df)), "El valor p presupone pares independientes. Revisa atípicos y estructura temporal o espacial."],
                   px.scatter(clean.head(5000), x=x, y=y, title=test))
@@ -240,6 +244,9 @@ def regression(df, model, response, predictors, exposure=None, *, positive=None)
     interval = fitted.conf_int().to_numpy()
     table = pd.DataFrame({"Variable": X.columns, "Coeficiente": fitted.params.to_numpy(), "Error estándar": fitted.bse.to_numpy(),
                           "IC 95 % inferior": interval[:, 0], "IC 95 % superior": interval[:, 1], "p": fitted.pvalues.to_numpy()})
+    if model in {"Lineal simple", "Lineal múltiple"}:
+        table["R²"] = fitted.rsquared
+        table["Observaciones"] = len(clean)
     if extra:
         with np.errstate(over="ignore"):
             table[extra] = np.exp(table["Coeficiente"])

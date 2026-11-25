@@ -14,6 +14,7 @@ from data_tables import (
     category_variants,
     csv_export,
     describe_table,
+    ratio_indicator,
     read_table,
     transform,
 )
@@ -39,8 +40,8 @@ def search(query, start, filters, sort):
 
 
 def store(title, df, sources, history=(), reversible=False, *, metadata=None):
-    if len(tables) >= 8 or sum(item["df"].size for item in tables.values()) + df.size > 4_000_000:
-        raise ValueError("Se alcanzó el límite de ocho tablas o cuatro millones de celdas. Retira una tabla.")
+    if len(tables) >= 12 or sum(item["df"].size for item in tables.values()) + df.size > 4_000_000:
+        raise ValueError("Se alcanzó el límite de doce tablas o cuatro millones de celdas. Retira una tabla.")
     st.session_state.serial += 1
     key = st.session_state.serial
     item = {"title": title, "df": df, "sources": tuple(dict.fromkeys(sources)), "history": tuple(history),
@@ -241,6 +242,29 @@ def workspace():
                     st.rerun()
                 except (ValueError, TypeError, KeyError) as exc:
                     st.error(str(exc))
+    numeric = [column for column in df.select_dtypes("number") if key_role(column) is None]
+    if len(numeric) >= 2:
+        with st.expander("Construir indicador"):
+            st.caption("El cálculo multiplica el cociente por la escala. Los denominadores ausentes o no positivos dejan el resultado vacío.")
+            with st.form(f"indicator_{key}"):
+                numerator = st.selectbox("Numerador", numeric)
+                denominator = st.selectbox("Denominador", numeric, index=1)
+                name = st.text_input("Nombre del indicador con unidad")
+                scale = st.number_input("Escala", min_value=0.000001, value=100.0)
+                submitted = st.form_submit_button("Guardar tabla con indicador")
+            if submitted:
+                try:
+                    changed, missing = ratio_indicator(df, name, numerator, denominator, scale)
+                    step = {"operación": "indicador", "variable": name.strip(), "numerador": numerator,
+                            "denominador": denominator, "escala": scale, "ausencias": missing}
+                    derived = store(f"{item['title']} · indicador", changed, item["sources"], (*item["history"], step),
+                                    True, metadata=item.get("metadata"))
+                    st.session_state.indicator_notice = derived
+                    st.rerun()
+                except ValueError as exc:
+                    st.error(str(exc))
+    if derived := st.session_state.pop("indicator_notice", None):
+        st.success(f"Indicador guardado en la tabla #{derived}.")
     with st.expander("Gestionar tablas"):
         if st.button("Retirar tabla seleccionada"):
             del tables[key]
