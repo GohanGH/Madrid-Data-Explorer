@@ -5,8 +5,10 @@ plotly==6.9.0
 openai==2.54.0
 openpyxl==3.1.5
 xlrd==2.0.2
-pyarrow==17.0.0
+pyarrow==17.0.0; python_version < "3.13"
+pyarrow==22.0.0; python_version >= "3.13"
 folium==0.20.0
 streamlit-folium==0.25.3
-scipy==1.15.3
+scipy==1.15.3; python_version < "3.14"
+scipy==1.16.3; python_version >= "3.14"
 statsmodels==0.14.5
