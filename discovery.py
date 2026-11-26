@@ -9,17 +9,28 @@ import requests
 from catalog import catalog_page
 
 TOPICS = {
-    "renta": (("renta", "ingreso", "ingresos", "riqueza", "salario"), "renta municipal"),
+    "renta": (("renta", "ingreso", "ingresos", "riqueza", "salario", "salarios", "poder adquisitivo"), "renta municipal"),
     "envejecimiento": (("envejecimiento", "envejecida", "envejecido", "personas mayores", "65 años"), "envejecimiento"),
-    "paro": (("paro", "desempleo", "desempleada", "desempleados", "desocupación"), "paro registrado"),
+    "paro": (("paro", "desempleo", "desempleada", "desempleados", "desocupación", "demandantes de empleo", "personas sin trabajo"), "paro registrado"),
     "población joven": (("joven", "jóvenes", "juventud", "infantil"), "juventud población"),
-    "población": (("población", "habitantes", "demográfico", "demográfica", "padrón"), "población empadronada"),
-    "educación": (("educación", "educativo", "estudios", "escolar"), "nivel educativo"),
-    "salud": (("salud", "sanitario", "hospital", "sanitaria", "atención primaria"), "centros sanitarios"),
+    "población": (("población", "habitantes", "demográfico", "demográfica", "demografía", "padrón", "empadronamiento", "censo", "crecimiento demográfico", "poblacional"), "población empadronada"),
+    "educación": (("educación", "educativo", "estudios", "escolar", "escolarización", "abandono escolar"), "nivel educativo"),
+    "salud": (("salud", "sanitario", "hospital", "sanitaria", "sanitarios", "sanitarias", "hospitales", "ambulatorios", "atención primaria"), "centros sanitarios"),
+    "aire": (("contaminación", "calidad del aire", "contaminación atmosférica", "no2", "pm10", "pm2.5", "ozono"), "calidad del aire"),
+    "densidad": (("densidad", "densidad poblacional", "habitantes por km2"), "densidad de población"),
+    "servicios sociales": (("servicios sociales", "dependencia", "exclusión social", "vulnerabilidad", "pobreza"), "servicios sociales"),
+    "ruralidad": (("rural", "rurales", "ruralidad", "despoblación"), "municipios rurales"),
     "vivienda": (("vivienda", "alquiler", "residencial"), "vivienda alquiler"),
     "transporte": (("transporte", "autobús", "autobuses", "movilidad", "metro"), "transporte público"),
+    "bibliotecas": (("biblioteca", "bibliotecas", "préstamo bibliotecario"), "bibliotecas públicas"),
+    "cultura": (("cultura", "cultural", "museo", "museos", "patrimonio"), "cultura"),
+    "seguridad": (("seguridad", "policía", "delitos", "criminalidad"), "seguridad ciudadana"),
 }
 STOP = {"que", "cuales", "quiero", "ver", "cual", "hay", "mas", "donde", "tiene", "tienen", "datos", "madrid", "como", "ha", "han", "en", "de", "del", "la", "las", "los", "el", "y", "por", "un", "una", "se", "es", "con", "sobre", "entre", "para", "me", "muestrame", "ultimos", "anos", "ano", "vive", "esta"}
+
+
+STOP |= {"existe", "relacion", "comunidad", "municipios", "municipio", "evolucion", "cambio",
+         "registros", "encontrar", "analizar", "estudiar", "comparar", "cambiado"}
 
 
 def fold(value):
@@ -44,39 +55,57 @@ class Query:
     recent: int | None
     intent: str
     terms: tuple
+    span: str | None = None
+
+
+def municipal_aliases(name):
+    match = re.fullmatch(r"(.+) \(([^()]+)\)", name)
+    return (name, f"{match[2]} {match[1]}", match[1]) if match else (name,)
 
 
 def interpret(question, municipalities=()):
     text = fold(question)
     topics = tuple(topic for topic, (aliases, _) in TOPICS.items() if any(mentions(a, text) for a in aliases))
-    if "población" in topics and {"envejecimiento", "población joven"}.intersection(topics):
+    if "población" in topics and {"envejecimiento", "población joven", "densidad"}.intersection(topics) and not re.search(
+        r"crecim|padr[oó]n|empadron|total de habitantes", text
+    ):
         topics = tuple(t for t in topics if t != "población")
-    specific = tuple(name for name in municipalities if name != "Madrid" and mentions(name, text))
+    specific = tuple(name for name in municipalities
+                     if (name != "Madrid" and any(mentions(alias, text) for alias in municipal_aliases(name)))
+                     or (name == "Madrid" and any(mentions(alias, text) for alias in ("Madrid capital", "municipio de Madrid"))))
     geo = ", ".join(specific) if specific else next(
         (name for name, pattern in (("Distritos", r"\bdistritos?\b"), ("Barrios", r"\bbarrios?\b"),
                                      ("Municipios", r"\bmunicip\w+\b|\bdonde\b|\bzonas?\b"),
                                      ("Comunidad de Madrid", r"\bmadrid\b")) if re.search(pattern, text)), None)
     years = tuple(dict.fromkeys(map(int, re.findall(r"\b(?:19|20)\d{2}\b", text))))
-    recent = re.search(r"ultim[oa]s?\s+(\d{1,2}|cinco|diez|veinte)\s+anos", text)
-    recent = ({"cinco": 5, "diez": 10, "veinte": 20}.get(recent[1], recent[1])) if recent else None
-    if re.search(r"relacion|correlacion|asocia", text):
+    numbers = {"dos": 2, "tres": 3, "cuatro": 4, "cinco": 5, "diez": 10, "veinte": 20}
+    recent_match = re.search(r"ultimos\s+(\d{1,2}|" + "|".join(numbers) + r")\s+anos", text)
+    recent = numbers.get(recent_match[1], recent_match[1]) if recent_match else None
+    if not recent and mentions("última década", text):
+        recent = 10
+    bound = re.search(r"\b(desde|hasta)\s+(?:el\s+)?(?:ano\s+)?(?:19|20)\d{2}\b", text)
+    span = bound[1] if bound and len(years) == 1 else None
+    if re.search(r"\b(relacion\w*|correlacion\w*|asocia\w*|vincul\w*|dependen\w*|influ\w*)\b", text):
         intent = "relación"
     elif re.search(r"crecid|crecimiento|variacion demogra", text) and "población" in topics:
         intent = "crecimiento"
-    elif re.search(r"evolu|cambiad|histori|serie|desde", text) or recent or len(years) > 1:
+    elif re.search(r"evolu|cambiad|histori|serie|desde", text) or recent or span or len(years) > 1:
         intent = "evolución"
-    elif re.search(r"compar", text):
+    elif re.search(r"compar|\b(?:mayor|menor|mas|menos)\b.*\b(?:mayor|menor|mas|menos)\b", text):
         intent = "comparación"
     elif geo:
         intent = "territorio"
     else:
         intent = "resumen"
     terms = tuple(dict.fromkeys(w for w in re.findall(r"[a-z]+", text) if w not in STOP))
-    return Query(question, topics, geo, years, int(recent) if recent else None, intent, terms)
+    return Query(question, topics, geo, years, int(recent) if recent else None, intent, terms, span)
 
 
 def queries(query):
     topical = [TOPICS[topic][1] for topic in query.topics]
+    municipal = bool(query.geography and query.geography not in {"Barrios", "Distritos", "Comunidad de Madrid"})
+    if municipal:
+        topical += [f"{term} municipios" for term in topical if "municip" not in term]
     literal = " ".join(query.terms[:8])
     return tuple(dict.fromkeys(q for q in [*topical, literal, query.text[:250]] if q))[:6]
 
@@ -100,13 +129,17 @@ def relevance(query, dataset):
     score = 4 * len(title_hits) + len(metadata_hits)
     reasons = []
     for topic in query.topics:
-        aliases = TOPICS[topic][0]
+        aliases, canonical = TOPICS[topic]
+        if mentions(canonical, title):
+            score += 12
         if any(mentions(word, title) for word in aliases):
             score += 10
             reasons.append(f"Indicador en el título: {topic}")
         elif any(mentions(word, metadata) for word in aliases):
             score += 3
             reasons.append(f"Tema en los metadatos: {topic}")
+    if not reasons and not title_hits and not metadata_hits:
+        return 0, []
     geo, temporal = coverage(dataset)
     if query.geography and geo and "municip" in fold(geo) and query.geography not in {"Distritos", "Barrios"}:
         score += 4
@@ -114,8 +147,8 @@ def relevance(query, dataset):
     if temporal and any(str(year) in temporal for year in query.years):
         score += 2
         reasons.append("Año mencionado en la cobertura")
-    if not reasons and title_hits:
-        reasons.append("Coincide con " + ", ".join(sorted(title_hits)))
+    if not reasons and (title_hits or metadata_hits):
+        reasons.append("Coincide con " + ", ".join(sorted(title_hits or metadata_hits)))
     return score, reasons
 
 
@@ -138,6 +171,8 @@ def retrieve(query, fetch=catalog_page):
             if not key:
                 continue
             score, reasons = relevance(query, dataset)
+            if not reasons:
+                continue
             row = score + 1 / (rank + 1), dataset, reasons
             if key not in candidates or row[0] > candidates[key][0]:
                 candidates[key] = row
@@ -146,7 +181,14 @@ def retrieve(query, fetch=catalog_page):
     featured = []
     if len(query.topics) > 1:
         for topic in query.topics:
-            matched = next((row for row in ranked if any(reason.endswith(f": {topic}") for reason in row[2])), None)
+            choices = [row for row in ranked if row not in featured
+                       and any(reason.endswith(f": {topic}") for reason in row[2])]
+            canonical = TOPICS[topic][1]
+            matched = max(choices, default=None, key=lambda row: (
+                mentions(canonical, fold(row[1].get("title", ""))),
+                f"Indicador en el título: {topic}" in row[2],
+                row[0],
+            ))
             if matched and matched not in featured:
                 featured.append(matched)
     ordered = featured + [row for row in ranked if row not in featured]

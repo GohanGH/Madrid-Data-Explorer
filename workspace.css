@@ -1,0 +1,79 @@
+.mde-brand {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    color: #eef3f8;
+    font-size: 1.16rem;
+    font-weight: 760;
+    line-height: 1.08;
+    margin-bottom: .45rem;
+}
+.mde-brand div span {
+    display: block;
+    color: #a2b0bf;
+    font-size: .75rem;
+    font-weight: 520;
+    margin-top: .22rem;
+}
+.mde-monogram {
+    display: grid;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    background: #126a5c;
+    border: 1px solid #248c78;
+    color: #f2fffa;
+    border-radius: .6rem;
+}
+.st-key-mde_navigation button {
+    justify-content: flex-start;
+    min-height: 2.45rem;
+}
+.st-key-mde_context {
+    border-bottom: 1px solid #293542;
+    padding-bottom: .35rem;
+}
+.st-key-mde_context [data-testid="stText"] {color: #bac6d3}
+.mde-home {
+    border-left: .2rem solid #47d0ac;
+    padding: .5rem 0 .6rem clamp(1rem, 3vw, 2rem);
+    margin: .35rem 0 1.5rem;
+}
+.mde-home h1 {
+    font-size: clamp(2.1rem, 5.2vw, 4.3rem);
+    line-height: 1.05;
+    letter-spacing: -.055em;
+    margin: 0 0 .68rem;
+    padding: 0;
+}
+.mde-home p {
+    color: #b4c0ce;
+    margin: 0;
+    max-width: 45ch;
+    font-size: 1.05rem;
+}
+.st-key-home_actions {
+    border-bottom: 1px solid #293542;
+    padding-bottom: 1.1rem;
+    margin-bottom: .6rem;
+}
+.st-key-home_topics button {
+    background: #18212c;
+    border-color: #2b3946;
+    min-width: 8.6rem;
+    justify-content: flex-start;
+}
+.st-key-home_topics button:hover {border-color: #47d0ac}
+.mde-project {
+    background: #141c26;
+    border: 1px solid #2b3946;
+    border-radius: .75rem;
+    padding: 1rem 1.15rem;
+}
+.mde-project p {color: #a2b0bf; font-size: .82rem; margin: 0 0 .35rem}
+.mde-project h2 {font-size: 1.15rem; padding: 0; margin: 0; overflow-wrap: anywhere}
+@media (max-width: 640px) {
+    .mde-home {margin-bottom: 1rem}
+    .st-key-home_topics button {min-width: 7.6rem}
+    .st-key-library_summary h3 {font-size: 1.35rem}
+}

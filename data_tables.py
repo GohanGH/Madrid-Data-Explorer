@@ -101,7 +101,12 @@ def category_variants(values):
     return values[values["normalizado"].duplicated(keep=False)].sort_values("normalizado")
 
 
-def transform(df, operation, column=None, *, decimal_comma=False, date_format="%Y-%m-%d"):
+def transform(df, operation, column=None, *, decimal_comma=False, date_format="%Y-%m-%d", selected=()):
+    if operation == "Conservar valores":
+        if not selected:
+            raise ValueError("Selecciona al menos un valor para conservar.")
+        filtered = df.loc[df[column].isin(selected)]
+        return filtered, len(df) - len(filtered)
     if operation == "Quitar duplicados":
         return df.drop_duplicates(), int(df.duplicated().sum())
     if operation == "Normalizar nombres de columnas":
@@ -149,3 +154,31 @@ def csv_export(df):
     for column in safe.select_dtypes(exclude=["number", "datetime"]):
         safe[column] = safe[column].map(cell)
     return safe.to_csv(index=False).encode("utf-8-sig")
+
+
+def period_change(df, entity, period, metric, start, end, name):
+    """Compare two periods without aggregating duplicate observations."""
+    from statistical_engine import numeric_values
+    from territories import normalize_code
+
+    name = name.strip()
+    if len({entity, period, metric}) != 3 or start == end or not name or name == entity:
+        raise ValueError("Selecciona variables distintas, dos periodos y un nombre nuevo para el indicador.")
+    columns = [f"{name} · {start}", f"{name} · {end}", f"{name} · cambio absoluto", name]
+    if entity in columns or len(set(columns)) != 4:
+        raise ValueError("El nombre del indicador coincide con otra columna de salida.")
+    pair = df.loc[df[period].isin([start, end]), [entity, period, metric]].copy()
+    if key_role(entity) == "Código municipal":
+        pair[entity] = pair[entity].map(lambda value: normalize_code(value, "auto") or value)
+    pair[metric] = numeric_values(pair[metric])
+    pair = pair.dropna(subset=[entity])
+    if pair.duplicated([entity, period]).any():
+        raise ValueError("Hay varias filas por entidad y periodo. Filtra la categoría antes de comparar.")
+    wide = pair.pivot(index=entity, columns=period, values=metric)
+    if start not in wide or end not in wide:
+        raise ValueError("Se necesitan datos en ambos periodos.")
+    first, last = wide[start], wide[end]
+    delta = last - first
+    result = pd.DataFrame({columns[0]: first, columns[1]: last, columns[2]: delta,
+                           name: numeric_values(100 * (delta / first.where(first.gt(0))))}).reset_index()
+    return result, int(result[name].isna().sum())

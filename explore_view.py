@@ -6,15 +6,21 @@ import streamlit as st
 
 from analytics import analyze
 from catalog import compatible_resources, download_table
-from data_tables import csv_export
+from data_tables import csv_export, read_table
 from dataset_cards import dataset_metadata
-from discovery import coverage, fold, interpret, mentions, retrieve
+from discovery import coverage, fold, interpret, mentions, municipal_aliases, retrieve
 from interface import correlation_sentence, metric_cards, navigate, report_chart
+from joins import key_role
+from loading import loading
 from map_view import SELECTION, export_chart, linked_map, remembered_choice, value_text
 from territories import (
     AGE,
+    DATA,
     EXAMPLES,
+    HEALTH,
     INDICATORS,
+    JOBS,
+    POP,
     RENT,
     analysis_window,
     growth,
@@ -37,11 +43,7 @@ def municipality_mentions(question):
     text = fold(question)
     found = []
     for code, (_, name) in names.items():
-        alias = name
-        if " (" in name and name.endswith(")"):
-            name_part, article = name[:-1].rsplit(" (", 1)
-            alias = f"{article} {name_part}"
-        if name != "Madrid" and (mentions(alias, text) or mentions(name, text)):
+        if name != "Madrid" and any(mentions(alias, text) for alias in municipal_aliases(name)):
             found.append(code)
     if mentions("madrid capital", text) or mentions("municipio de madrid", text):
         found.extend(code for code, (_, name) in names.items() if name == "Madrid")
@@ -304,13 +306,46 @@ def render_report(query, plan, prefix):
     render_sources(sources)
 
 
-def render_candidates(query, store):
-    with st.spinner("Buscando coincidencias en el catálogo oficial…"):
+def local_candidates(query, store):
+    known = {"población": POP, "paro": JOBS, "renta": RENT, "envejecimiento": AGE, "salud": HEALTH}
+    sources = {known[topic]: source_metadata()[known[topic]] for topic in query.topics if topic in known}
+    if sources:
+        with st.expander("Extractos oficiales listos para importar", expanded=len(query.topics) > 1):
+            for key, metadata in sources.items():
+                st.link_button(metadata["title"], metadata["url"])
+                st.caption(f"{metadata['referencia']} · {metadata['unidad']} · {metadata['cobertura']}")
+                if st.button(f"Importar extracto · {INDICATORS[key][0]}", key=f"import_local_{key}"):
+                    try:
+                        frame = read_table((DATA / f"{key}.csv").read_bytes(), "CSV")
+                        store(INDICATORS[key][0], frame, [metadata["url"]],
+                              history=[{"operación": "importar extracto oficial", "archivo": f"{key}.csv",
+                                        "referencia": metadata["referencia"]}], metadata=metadata)
+                        st.success("Extracto disponible en Analizar.")
+                    except (ValueError, OSError) as exc:
+                        st.error(str(exc))
+    return set(query.topics) & known.keys()
+
+
+def render_candidates(query, store, *, automatic=False):
+    with loading("Buscando coincidencias en el catálogo oficial…"):
         rows, failed = candidates(query)
+    local_topics = local_candidates(query, store)
+    covered = local_topics | {topic for topic in query.topics for _, _, reasons in rows
+                              if any(reason.endswith(f": {topic}") for reason in reasons)}
+    if not automatic:
+        if len(query.topics) > 1 and covered == set(query.topics):
+            st.info("La pregunta requiere combinar fuentes. Identifica cada unidad, cruza códigos municipales y "
+                    "periodos compatibles, y calcula los cambios antes de medir la relación.")
+        elif rows or local_topics:
+            st.info("Se encontraron fuentes relacionadas. Revisa su definición, unidad, cobertura y periodo antes de analizarlas.")
+        elif failed:
+            st.warning("No se pudo confirmar la disponibilidad de datos porque el catálogo respondió parcialmente.")
+        else:
+            st.info("No se encontraron datos suficientes para esta pregunta. Prueba otro indicador o ámbito.")
     st.subheader("Fuentes del catálogo relacionadas")
     if failed:
         st.info("Alguna consulta al catálogo tardó demasiado. Se muestran las coincidencias recuperadas.")
-    if not rows:
+    if not rows and not local_topics:
         st.caption("Prueba con un indicador concreto, como «paro registrado» o «centros de salud».")
     for _, ds, reasons in rows:
         identifier = ds.get("id") or ds["name"]
@@ -337,12 +372,15 @@ def render_candidates(query, store):
                         from requests import RequestException
 
                         try:
-                            with st.spinner("Cargando el recurso oficial…"):
+                            with loading("Cargando el recurso oficial…"):
                                 resource = resources[index]
                                 df = download_table(resource)
                                 if df.empty:
                                     raise ValueError("El recurso está vacío.")
                                 store(ds["title"], df, [resource["url"]], metadata=dataset_metadata(ds, resource))
+                            keys = [f"{column} ({role})" for column in df if (role := key_role(column))]
+                            if keys:
+                                st.caption("Claves candidatas tras leer las columnas. " + ", ".join(keys))
                             st.success("Tabla guardada. Ábrela en Analizar.")
                         except (ValueError, OSError, TypeError, KeyError, RequestException):
                             st.error("El recurso no se pudo cargar. Consulta la ficha o elige otro formato.")
@@ -416,12 +454,13 @@ def question_screen(store):
     prefix = str(st.session_state.get("question_id", 0))
     plan = question_plan(query, municipality_mentions(question))
     if plan:
+        st.caption("Análisis automático con indicadores verificados")
         render_report(query, plan, prefix)
     else:
         st.header("Fuentes para responder tu pregunta")
         st.info("Consulta las fuentes candidatas. Para cruzarlas en Analizar, comprueba primero sus claves y periodos.")
     if st.session_state.get("question_live"):
-        render_candidates(query, store)
+        render_candidates(query, store, automatic=bool(plan))
     elif st.button("Buscar fuentes adicionales en el catálogo"):
         st.session_state.question_live = True
         st.rerun()

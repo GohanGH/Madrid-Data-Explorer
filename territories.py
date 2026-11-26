@@ -83,9 +83,11 @@ def question_plan(query, municipalities=()):
         return None
     topics = set(query.topics)
     text = fold(query.text)
-    if re.search(r"\b(tasa de (paro|desempleo)|salarios?|densidad|menores?)\b", text):
+    if re.search(r"\b(tasa de (paro|desempleo)|salarios?|densidad|menores?|hospital(?:es)?)\b", text):
         return None
     if topics == {"renta", "envejecimiento"} and query.intent in {"relación", "comparación"}:
+        if re.search(r"\b(?:mayor|menor|mas|menos)\b", text) and query.intent == "comparación":
+            return None
         if any(year != 2024 for year in query.years) or query.recent:
             return None
         return "relación", (AGE, RENT)
@@ -94,7 +96,7 @@ def question_plan(query, municipalities=()):
     if not indicator:
         return None
     if query.intent == "crecimiento":
-        if indicator != POP or len(query.years) == 1:
+        if indicator != POP or (len(query.years) == 1 and query.span is None):
             return None
         return "crecimiento", (indicator,)
     if query.intent == "relación":
@@ -111,7 +113,8 @@ def analysis_window(frame, query):
     if query.years:
         if any(year not in available for year in query.years):
             return frame.iloc[:0]
-        start, end = min(query.years), max(query.years)
+        start = available[0] if query.span == "hasta" else min(query.years)
+        end = available[-1] if query.span == "desde" else max(query.years)
     elif query.recent:
         end = available[-1]
         start = end - query.recent
@@ -136,3 +139,20 @@ def verified_relationship():
 
     frame, info = demo_table(DEMO_NAMES[0])
     return frame.dropna(subset=list(frame.columns[3:])), info
+
+
+@lru_cache(maxsize=1)
+def municipal_names():
+    from discovery import municipal_aliases
+
+    aliases = {}
+    for code, (_, name) in official_codes().items():
+        for variant in municipal_aliases(name):
+            aliases.setdefault(fold(variant).strip(), set()).add(code)
+    return {name: next(iter(codes)) for name, codes in aliases.items() if len(codes) == 1}
+
+
+def municipal_identifier(value, system="auto"):
+    if system == "Nombre municipal":
+        return None if pd.isna(value) else municipal_names().get(fold(value).strip())
+    return normalize_code(value, system)

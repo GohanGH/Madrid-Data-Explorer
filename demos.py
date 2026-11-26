@@ -10,7 +10,9 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data_tables import csv_export, describe_table, ratio_indicator, read_table
+from interface import validate_selection
 from joins import join_preview
+from projects import remember_result
 from reports import html_report
 from statistical_engine import association, numeric_values, regression, temporal
 from territories import (
@@ -224,7 +226,9 @@ def employment_view(frame, tag):
             st.warning(str(exc))
             notes.append(str(exc))
     map_metric = st.selectbox("Indicador del mapa", [metric, ABS, PCT], key=f"{tag}_map")
-    map_year = st.selectbox("Año del recuento en el mapa", sorted(map(int, subset[YEAR].unique()), reverse=True),
+    map_years = sorted(map(int, subset[YEAR].unique()), reverse=True)
+    validate_selection(f"{tag}_mapyear", map_years)
+    map_year = st.selectbox("Año del recuento en el mapa", map_years,
                             key=f"{tag}_mapyear", disabled=map_metric != metric)
     mapped = subset[subset[YEAR].eq(map_year)] if map_metric == metric else ranking
     figures["Mapa municipal"] = study_map(mapped, map_metric, f"{map_metric} · {map_year if map_metric == metric else f'{start}–{end}'}")
@@ -386,7 +390,11 @@ def render_study(name, store):
                            f"{tag}-vista.html", "text/html", key=f"{tag}_chart", on_click="ignore")
         if st.button("Añadir tabla combinada a Analizar", key=f"{tag}_store"):
             try:
-                store(name, frame.copy(), [source["url"] for source in metadata["fuentes"]], [*history, *joins], metadata=metadata)
+                dataset = store(name, frame.copy(), [source["url"] for source in metadata["fuentes"]],
+                                [*history, *joins], metadata=metadata)
+                for index, (label, table) in enumerate(tables.items()):
+                    remember_result(st.session_state, dataset, {"análisis": label, **parameters}, table, summary, notes,
+                                    list(figures.values()) if index == 0 else [])
                 st.success("Tabla disponible en Analizar.")
             except ValueError as exc:
                 st.error(str(exc))

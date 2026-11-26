@@ -55,6 +55,33 @@ def _keys(frame, columns, side, roles):
                       for i, key in enumerate(keys)], dtype=object)
 
 
+def key_evidence(left, right, limit=20):
+    """Rank named or semantically compatible pairs using a bounded sample of actual values."""
+    pairs = {(a, b) for a, b, _ in suggest_keys(left, right)}
+    right_names = {}
+    for col in right:
+        right_names.setdefault(normalized_name(col), []).append(col)
+    for col in left:
+        pairs.update((col, right_col) for right_col in right_names.get(normalized_name(col), []))
+    if not pairs:
+        cols_a, cols_b = list(left)[:14], list(right)[:14]
+        pairs = {(a, b) for a in cols_a for b in cols_b
+                 if left[a].dtype == right[b].dtype}
+    evidence = []
+    for a, b in sorted(pairs)[:200]:
+        role_a, role_b = key_role(a), key_role(b)
+        role = role_a if role_a == role_b else None
+        a_keys = set(_keys(left[[a]].head(500), [a], "A", [role]))
+        b_keys = set(_keys(right[[b]].head(500), [b], "B", [role]))
+        overlap = len(a_keys & b_keys)
+        if overlap or role or normalized_name(a) == normalized_name(b):
+            evidence.append({"Izquierda": a, "Derecha": b, "Rol común": role or "Sin identificar",
+                             "Tipo A": str(left[a].dtype), "Tipo B": str(right[b].dtype),
+                             "Valores comunes en la muestra": overlap})
+    return sorted(evidence, key=lambda row: (-row["Valores comunes en la muestra"], row["Izquierda"], row["Derecha"]))[:limit]
+
+
+
 def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
     if (not left.columns.is_unique or not right.columns.is_unique
             or not left_key or len(left_key) != len(right_key)
@@ -72,7 +99,8 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
         raise ValueError("Unión muchos a muchos: la misma clave se repite en ambas tablas. "
                          "Añade periodo o categoría a la clave, o resuelve los duplicados.")
     matched = sum(int(ac[k]) * int(bc[k]) for k in shared)
-    only_a, only_b = int((~a.isin(shared)).sum()), int((~b.isin(shared)).sum())
+    unmatched_a, unmatched_b = ~a.isin(shared), ~b.isin(shared)
+    only_a, only_b = int(unmatched_a.sum()), int(unmatched_b.sum())
     estimate = matched + (only_a if how in {"left", "outer"} else 0) + (
         only_b if how in {"right", "outer"} else 0)
     if estimate > max_rows or estimate * (len(left.columns) + len(right.columns)) > 3_000_000:
@@ -92,6 +120,8 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
             years = {"comunes": sorted(left_years & right_years), "solo_A": sorted(left_years - right_years),
                      "solo_B": sorted(right_years - left_years)}
             break
+    if years and not years["comunes"]:
+        warnings.append("Los conjuntos tienen años distintos. Comprueba la comparabilidad temporal.")
     if any(x != y and x and y for x, y in paired_roles):
         warnings.append("Algunas claves tienen funciones geográficas o temporales distintas.")
     if (any(key_role(c) in {"Año", "Fecha"} for c in [*left, *right])
@@ -121,6 +151,8 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
         merged[column] = first.combine_first(second)
         if column == right_column:
             merged = merged.drop(columns=second_name)
+    examples_a = left[left_key].iloc[unmatched_a.to_numpy()].head(10).astype("string").fillna("(Ausente)")
+    examples_b = right[right_key].iloc[unmatched_b.to_numpy()].head(10).astype("string").fillna("(Ausente)")
     return merged, {
         "claves": list(zip(left_key, right_key)), "filas_A": len(left), "filas_B": len(right),
         "filas": len(merged), "filas_coincidentes": matched, "solo_izquierda": only_a,
@@ -133,5 +165,7 @@ def join_preview(left, right, left_key, right_key, how, max_rows=250_000):
         "años": years,
         "filas_A_perdidas": only_a if how in {"inner", "right"} else 0,
         "filas_B_perdidas": only_b if how in {"inner", "left"} else 0,
+        "ejemplos_sin_coincidencia_A": examples_a.to_dict("records"),
+        "ejemplos_sin_coincidencia_B": examples_b.to_dict("records"),
         "advertencias": warnings,
     }

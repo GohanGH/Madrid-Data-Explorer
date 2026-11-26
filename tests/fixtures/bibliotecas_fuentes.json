@@ -1,0 +1,26 @@
+[
+  {
+    "name": "1916180",
+    "title": "Bibliotecas públicas. Población atendida. Municipios",
+    "url": "https://datos.comunidad.madrid/dataset/e96e85fd-61b5-4817-a6f1-083e3960fedd/resource/70ff1cb7-3af2-458d-8712-b2b0369115b4/download/bibliotecas-publicas.-poblacion-atendida.-municipios.csv",
+    "sha256": "f630a178c10eedef8fe248d58fc29626ca610b8cf96b8865d426efb10e6f3707",
+    "licencia": "Creative Commons Attribution",
+    "metadata": "2026-11-05T17:55:40.505034",
+    "consulta": "2026-11-26",
+    "extracto": "bibliotecas_1916180_2025.csv",
+    "sha256_extracto": "4103dd9380ca2fff6401eb3345098a9c4d8ad46e5dabf67addc6a78d6328f61f",
+    "filas": 179
+  },
+  {
+    "name": "1928360",
+    "title": "Bibliotecas públicas. Visitas. Municipios",
+    "url": "https://datos.comunidad.madrid/dataset/2e3b4e6c-846a-4f6a-98d4-31ec12fb341d/resource/76a893f1-53ee-42b0-8a82-a867f8210116/download/bibliotecas-publicas.-visitas.-municipios.csv",
+    "sha256": "c3dc80e9fa6f53170aea43fcc7b5d07ad39763a36793c5b9a9cd06856cfc3c5d",
+    "licencia": "Creative Commons Attribution",
+    "metadata": "2026-11-05T18:02:26.573153",
+    "consulta": "2026-11-26",
+    "extracto": "bibliotecas_1928360_2025.csv",
+    "sha256_extracto": "3141215d1a28fde1cd0c63c9049a99140002d52309c1b0a89e264376698bb50d",
+    "filas": 179
+  }
+]

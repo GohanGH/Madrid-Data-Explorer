@@ -1,93 +1,59 @@
-# Madrid Data Explorer · DATAMAD 2026
+# Madrid Data Explorer 4.0 · DATAMAD 2026
 
-Aplicación Streamlit en español para descubrir, combinar y analizar datos abiertos de la Comunidad de Madrid. Incluye tres demostraciones reproducibles con extractos oficiales.
+Madrid Data Explorer es un espacio de trabajo en español para investigar con datos abiertos de la Comunidad de Madrid. Busca fuentes oficiales o importa tus propios datos, elige cómo preparar y cruzar las tablas y calcula resultados para tu pregunta. Comparte el proyecto completo para que otra persona pueda continuarlo.
 
-## Explora Madrid con una pregunta
+[Abrir Madrid Data Explorer en Streamlit](https://madrid-data-explorer.streamlit.app/)
 
-- **Explorar** interpreta preguntas en español y ordena fuentes del catálogo. Para los indicadores validados, abre directamente un mapa, ranking, serie histórica, resumen o cruce.
-- **Mapa** colorea los 179 municipios con límites oficiales del IGN. Busca o pulsa hasta seis municipios, cambia indicador, año, colores y clasificación (cuantiles, intervalos iguales o Jenks), consulta su posición y evolución, y descarga el mapa o sus datos.
-- **Analizar** reúne preparación, uniones, análisis estadístico, gráficos y asistente opcional. Si una tabla tiene códigos municipales reconocidos, propone el mapa incorporado.
-- **Catálogo** conserva la búsqueda CKAN por filtros, la selección múltiple y la importación de archivos.
+| Espacio | Qué puedes hacer |
+| --- | --- |
+| **Home** | Buscar en el catálogo, iniciar o abrir un proyecto e importar archivos. |
+| **Datos** | Consultar fichas y recursos CKAN, previsualizar, importar varias fuentes y explorar la biblioteca. |
+| **Preparación** | Limpiar y transformar, calcular indicadores, combinar tablas y recuperar versiones. |
+| **Análisis** | Elegir variables, revisar supuestos y ejecutar descriptivos, contrastes, modelos y análisis temporal o espacial. |
+| **Visualización** | Construir gráficos y mapas con la tabla activa. |
+| **Resultados** | Organizar tablas, análisis y figuras en el cuaderno y redactar informes HTML. |
+| **Mis proyectos** | Guardar un ZIP portable con el trabajo o abrir un proyecto existente. |
 
-La portada incluye un buscador central y accesos temáticos a población, economía, empleo, salud, educación, vivienda y transporte. Los informes muestran primero la respuesta, sus indicadores y una visualización con vistas intercambiables. Los filtros y descargas siguen disponibles junto a cada informe. Desde Explorar puedes abrir cinco consultas preparadas con datos oficiales: renta por habitante, envejecimiento, evolución del paro registrado, crecimiento poblacional y relación entre renta y envejecimiento. Los extractos permiten ejecutar esos ejemplos sin credenciales ni consultas CKAN. El padrón cubre 2015–2025. El crecimiento se calcula como variación porcentual entre los extremos con datos para cada municipio.
-
-La recuperación temática funciona con un vocabulario configurable en Python. Un tema, territorio, unidad o año sin análisis validado puede devolver fichas relacionadas para explorar. El catálogo y los recursos Leaflet del mapa necesitan conexión. La selección municipal es compartida por los informes y el mapa dentro de la sesión. Consulta [el diseño 2.0, los códigos y la licencia cartográfica](docs/UX_2.md).
-
-## Estudio estadístico 3.0
-
-En **Analizar → Estudio estadístico**, cada tabla tiene un diagnóstico, un informe exploratorio y recomendaciones revisables de limpieza. Las correcciones crean versiones comparables con el original. El estudio propone análisis por rol de variable y ejecuta los contrastes y regresiones solo al pulsar **Ejecutar análisis**. Puedes descargar datos, resultados, gráficos e informes HTML. El tema oscuro también se aplica a los mapas y las visualizaciones. Consulta [la guía técnica y las limitaciones estadísticas](docs/MDE_3.md).
+La barra lateral mantiene el proyecto y la tabla activa accesibles. Cada transformación confirmada crea una versión. El cuaderno guarda los resultados con su tabla, configuración, fecha y fuentes.
 
 ## Ejecutar en macOS o Linux
 
-Usa Python 3.11 para reproducir la configuración de CI y Community Cloud. Si ya tienes un entorno virtual de otra versión, crea uno nuevo y ajusta la ruta de activación.
+Desde la carpeta que contiene `app.py`, usa Python 3.11.
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
+python3.11 -m venv "$HOME/.venvs/madrid-data-explorer-4"
+source "$HOME/.venvs/madrid-data-explorer-4/bin/activate"
 python -m pip install -r requirements.txt
 python -m streamlit run app.py
 ```
 
-La aplicación abre en `http://localhost:8501`. La búsqueda oficial requiere Internet. La importación, las demostraciones incluidas y el análisis manual funcionan con archivos locales.
+Abre [localhost:8501](http://localhost:8501). El catálogo en vivo requiere conexión. Con archivos locales o los extractos oficiales incluidos puedes preparar datos, analizar y guardar un proyecto sin credenciales. Se admiten CSV, TSV, XLSX, XLS y JSON tabular. Los mapas municipales incorporan los límites de los 179 municipios derivados de la BDLJE del IGN, con atribución CC BY 4.0.
 
-## Flujo de trabajo
+## Investigar y compartir
 
-1. En **Catálogo**, busca por tema, revisa los metadatos y selecciona uno o varios recursos. Después de la primera búsqueda aparecen los filtros ofrecidos por CKAN. También puedes importar CSV, TSV, XLSX, XLS o JSON tabular.
-2. En **Analizar → Preparar y combinar tablas**, revisa las primeras 100 filas, los valores faltantes y los duplicados. Puedes convertir números y fechas, normalizar nombres y categorías, o quitar duplicados mediante una transformación confirmada.
-3. En **Combinar tablas**, elige claves equivalentes en el mismo orden. Para datos municipales longitudinales, usa código municipal y periodo si ambos son comparables. Previsualiza, revisa coincidencias y cardinalidad, y confirma para guardar. Las claves reconocidas de Madrid se comparan en formato INE y se muestran los años comunes y las filas perdidas de cada fuente. Las uniones muchos a muchos que multiplicarían filas se bloquean. Puedes encadenar cruces y deshacer la última operación. En **Construir indicador**, guarda una versión nueva con un cociente escalado.
-4. En **Analizar → Resultados y gráficos**, selecciona una operación manual o formula una pregunta si la IA está configurada. Los resultados incluyen estadísticas, gráficos cuando corresponden, CSV y un JSON de metodología. Para capas alternativas se puede aportar un GeoJSON municipal WGS84.
+1. Busca una fuente en **Home** o **Datos → Catálogo**. Consulta su ficha, previsualiza un recurso y añádelo a la selección. Las importaciones aparecen en **Datos → Biblioteca**.
+2. Selecciona una tabla y abre **Preparación**. Previsualiza y confirma cada transformación. Para unir fuentes, elige claves equivalentes y revisa la cardinalidad y los registros sin pareja.
+3. En **Análisis**, elige el método, las variables y los filtros. Pulsa **Ejecutar** para calcular y guardar un resultado. En **Visualización** crea gráficos y mapas con cualquier tabla compatible.
+4. En **Resultados → Informes**, selecciona resultados y añade texto. Descarga el HTML y usa **Imprimir → Guardar como PDF** en el navegador cuando necesites ese formato.
+5. En **Mis proyectos → Proyecto activo**, prepara y descarga el ZIP. Tu compañero puede importarlo en **Mis proyectos → Abrir**. La versión 4.0 lee proyectos guardados con la 3.1.
 
-## Estudios de ejemplo
+[Guía del equipo](docs/GUIA_EQUIPO.md) · [Arquitectura 4.0](docs/MDE_4.md) · [Validación reproducible](docs/VALIDACION_FINAL.md) · [Registro de cambios](CHANGELOG.md)
 
-En **Explorar → Estudios de ejemplo**, pulsa **Abrir estudio**. Los tres estudios usan datos oficiales y se ejecutan sin claves ni conexión después de instalar la aplicación.
+## Fuentes y pruebas
 
-| Estudio | Análisis inicial |
-| --- | --- |
-| Envejecimiento y centros sanitarios | Censo, recuentos de atención primaria y padrón de 2024. Calcula ambos indicadores, cruza por municipio y año y ejecuta Pearson y Spearman. |
-| Evolución del desempleo | Recuentos municipales a 31 de marzo de 2018–2025. Compara series, recuentos y cambios absolutos y porcentuales. |
-| Renta y envejecimiento | Renta disponible bruta por habitante y porcentaje censal de población de 65 años y más en 2024. Calcula Pearson, Spearman y OLS lineal con intervalos HC3. |
-
-En **Resultados**, cambia los filtros o métodos y usa **Vista** para alternar entre los gráficos y mapas. En **Datos y preparación**, abre las fuentes, el diagnóstico, la limpieza y la auditoría de uniones. En **Descargas**, guarda los datos y el informe o incorpora la tabla combinada a **Analizar**. El informe HTML incrusta los gráficos y mapas. Ábrelo en el navegador para guardarlo como PDF con el diálogo de impresión.
-
-### Recorrido de 90 segundos ante el jurado
-
-1. **0–15 s.** Abre **Envejecimiento y centros sanitarios**. Muestra el resultado de Pearson y la dispersión.
-2. **15–40 s.** En **Datos y preparación**, abre **Datos y fuentes** y **Unión**. Señala el padrón, el recuento, el censo y el cruce por INE y año.
-3. **40–65 s.** Vuelve a **Resultados** y elige **Mapa Y** para mostrar los centros por 10.000 habitantes. Selecciona municipios si quieres comparar sus valores.
-4. **65–90 s.** Abre **Descargas** y descarga el informe HTML. Los mismos controles están disponibles en los estudios de paro registrado y renta.
-
-### Reproducir el corte oficial
-
-Los extractos de `demo_data/` son el corte que usa la aplicación. Conservan los códigos publicados con sus ceros iniciales. Las fuentes tabulares se verificaron el 25 de noviembre de 2026. Las geometrías se obtuvieron del WFS del IGN el 18 de noviembre de 2026. Los mapas de los estudios se dibujan con la capa local y sin un mapa base remoto. [Resultados, referencias y limitaciones](RESULTADOS_DATAMAD.md) · [Metadatos de las fuentes](demo_data/sources.json)
-
-Para comparar el corte con una descarga oficial posterior, genera extractos en otra carpeta.
-
-```bash
-python demo_data/build.py --output nuevos-extractos --save-raw csv-originales
-```
-
-Para regenerar desde descargas conservadas, usa `--local carpeta-csv` en lugar de `--save-raw`. Usa `mde-<clave>.csv` con las claves de `demo_data/sources.json` y `mde-paro.csv` para la serie de paro. Para reconstruir la geometría, `python demo_data/build_geometry.py` acepta las páginas GeoJSON del servicio WFS y valida que haya 179 municipios.
-
-## IA opcional
-
-Configura `OPENAI_API_KEY` como variable de entorno o en `.streamlit/secrets.toml`. `MDE_AI_MODEL` selecciona el modelo y `MDE_AI_BASE_URL` permite un proveedor compatible con la API Responses y respuestas JSON. [.env.example](.env.example) enumera las variables, que deben exportarse en el entorno para que la aplicación las lea. La aplicación comparte con el proveedor la pregunta y el esquema de hasta 100 columnas. Cada petición ejecuta una operación sobre la tabla activa y respeta los filtros aplicados en la interfaz.
-
-## Pruebas
+Los extractos oficiales y sus fechas, unidades y recursos están en [los metadatos](demo_data/sources.json). Los análisis históricos se documentan en [Resultados DATAMAD](RESULTADOS_DATAMAD.md). Para regenerar los extractos en otra carpeta, usa `python demo_data/build.py --output nuevos-extractos --save-raw csv-originales`. Para recrearlos a partir de archivos descargados, usa `--local carpeta-csv` y consulta los nombres esperados en `demo_data/build.py`.
 
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m ruff check .
 python -m pytest -q
-python -m pip check
+MDE_RUN_INTEGRATION=1 python -m pytest -q -m integration
 ```
 
-Las pruebas habituales no requieren Internet ni credenciales. Para verificar CKAN y una descarga real ejecuta `MDE_RUN_INTEGRATION=1 python -m pytest -q -m integration`. CI instala las dependencias en Python 3.11 y ejecuta Ruff y pytest. Consulta la [arquitectura y sus límites](docs/ARCHITECTURE.md) para ver responsabilidades y decisiones.
+La última línea consulta el catálogo en vivo. La suite habitual usa datos locales y respuestas controladas para que el recorrido sea reproducible.
 
-## Desplegar en Streamlit Community Cloud
+## Community Cloud
 
-1. Publica en GitHub una rama que contenga estos archivos. Mantén fuera del repositorio los secretos y el entorno virtual.
-2. En [Streamlit Community Cloud](https://share.streamlit.io/), crea una aplicación desde esa rama. Selecciona `app.py` y Python 3.11 en los ajustes avanzados.
-3. Configura `OPENAI_API_KEY` en **Secrets** si vas a activar la IA y limita el gasto del proveedor para una app pública. Puedes desplegar sin clave.
-4. Verifica en la URL que carguen Inicio, una demostración y una búsqueda oficial.
+El archivo de entrada es **`app.py`**, con `requirements.txt` en la raíz. Para un despliegue nuevo, selecciona el repositorio, la rama y Python 3.11. Para actualizar la aplicación existente, publica los cambios revisados en la rama conectada y comprueba el arranque y el catálogo en sus logs. [Instrucciones de publicación](docs/GUIA_EQUIPO.md#actualizar-github-y-streamlit-después-de-la-revisión) · [Documentación de Streamlit Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy)
 
-La capa municipal incorporada usa límites actuales simplificados. Los mapas de otras capas dependen del GeoJSON aportado y de sus códigos. Para comparar fuentes, comprueba definiciones, unidades y denominadores antes de interpretar un resultado. Los recursos alojados fuera de los dominios admitidos pueden incorporarse mediante importación manual.
+El espacio de trabajo funciona sin una API de IA. El asistente opcional de planes utiliza `OPENAI_API_KEY`, `MDE_AI_MODEL` y `MDE_AI_BASE_URL` como ajustes. Envía la pregunta y los nombres de hasta 100 columnas al proveedor configurado. El plan se muestra para revisión y se calcula localmente al ejecutar. [Configuración de ejemplo](.env.example)

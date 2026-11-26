@@ -1,6 +1,7 @@
 import pandas as pd
 import pytest
 from streamlit.testing.v1 import AppTest
+from workbench_helpers import add_offline, checked, go, press, set_widget, start, submit
 
 from discovery import interpret, retrieve
 from explore_view import municipality_mentions
@@ -87,55 +88,59 @@ def test_population_window_and_growth():
     assert value == pytest.approx(100 * (getafe[2025] / getafe[2015] - 1))
 
 
-@pytest.mark.parametrize("index", range(len(EXAMPLES)))
-def test_example_route_and_exports(index, monkeypatch):
-    monkeypatch.setattr("map_view.st_folium", lambda *args, **kwargs: {})
-    app = AppTest.from_file("app.py", default_timeout=30).run()
-    app.button(key=f"example_{index}").click().run()
-    assert not app.exception
-    assert app.session_state.question == EXAMPLES[index]
-    assert app.get("download_button")
-    assert app.get("plotly_chart") or index in {0, 1, 3}
+@pytest.mark.parametrize("question", EXAMPLES)
+def test_old_questions_lead_to_source_discovery_without_running_a_method(question, monkeypatch):
+    dataset = {"name": "fuente", "id": "fuente", "title": "Fuentes municipales", "notes": "Variables para el análisis."}
+    monkeypatch.setattr("library_view.find_sources", lambda *args, **kwargs: ({"count": 1, "results": [dataset]}, False))
+    app = start()
+    set_widget(app, "text_input", "home_query", question, rerun=False)
+    submit(app, "Buscar datos")
+    assert app.session_state.page == "Datos"
+    assert app.session_state.catalog_request[:2] == (question, "Lenguaje natural")
+    assert any("fuentes candidatas" in node.value for node in app.caption)
+    assert not app.session_state.project_results
+    assert not app.get("plotly_chart")
 
 
-def test_map_click_and_question_survive_navigation(monkeypatch):
+def test_linked_map_click_retains_municipal_selection(monkeypatch):
     event = {"last_object_clicked_tooltip": "Municipio Getafe / Código INE 28065",
              "last_object_clicked": {"lat": 40.3, "lng": -3.7}}
     monkeypatch.setattr("map_view.st_folium", lambda *args, **kwargs: event)
-    app = AppTest.from_file("app.py", default_timeout=30).run()
-    app.button(key="example_2").click().run()
-    app.button(key="nav_Mapa").click().run()
-    assert not app.exception
+    app = checked(AppTest.from_string("from explore_view import full_map\nfull_map()", default_timeout=50).run())
     assert app.session_state[SELECTION] == ["28065"]
-    assert "Getafe" in app.dataframe[0].value["Municipio"].tolist()
-    app.button(key="nav_Explorar").click().run()
-    assert app.session_state.question == EXAMPLES[2]
-    assert not app.exception
+    assert any("Getafe" in frame.value.get("Municipio", pd.Series(dtype=str)).tolist()
+               for frame in app.dataframe)
+    checked(app.run())
+    assert app.session_state[SELECTION] == ["28065"]
+
+
+def test_natural_language_query_lists_ranked_sources(monkeypatch):
+    dataset = {"id": "educacion", "name": "educacion", "title": "Nivel educativo municipal", "notes": "Estudios por municipio."}
+    monkeypatch.setattr("library_view.find_sources", lambda *args, **kwargs: ({"count": 1, "results": [dataset]}, False))
+    app = start()
+    set_widget(app, "text_input", "home_query", "Quiero comparar desempleo y nivel educativo", rerun=False)
+    submit(app, "Buscar datos")
+    assert any(node.label == "Nivel educativo municipal" for node in app.expander)
+    assert any("fuentes candidatas" in node.value for node in app.caption)
+
+
+def test_map_indicator_and_filter_survive_navigation():
+    app = start()
+    ids = add_offline(app, [POP])
+    key = ids[POP]
+    go(app, "Visualización")
+    set_widget(app, "radio", "visual_section", "Mapas")
+    prefix = f"cfg_visual_new_{key}_map"
+    set_widget(app, "number_input", f"{prefix}_filter_count", 1)
+    set_widget(app, "selectbox", f"{prefix}_filter_0_column", "Año")
+    set_widget(app, "text_input", f"{prefix}_filter_0_value", "2019")
+    set_widget(app, "selectbox", f"{prefix}_0_palette", "Verde")
+    go(app, "Home")
+    go(app, "Visualización")
+    assert app.selectbox(key=f"{prefix}_0_metric").value == "Población (personas)"
+    assert app.text_input(key=f"{prefix}_filter_0_value").value == "2019"
+    assert app.selectbox(key=f"{prefix}_0_palette").value == "Verde"
     assert app.get("plotly_chart")
-
-
-def test_live_question_fallback_uses_ranked_cards(monkeypatch):
-    fixture = {"name": "educacion", "title": "Nivel educativo municipal", "notes": "Estudios por municipio."}
-    monkeypatch.setattr("explore_view.candidates", lambda _: ([(12, fixture, ["Tema: educación"])], False))
-    app = AppTest.from_file("app.py", default_timeout=30).run()
-    app.text_input(key="question_input").set_value("Quiero comparar desempleo y nivel educativo")
-    next(w for w in app.button if w.label == "Buscar respuesta").click().run()
-    assert not app.exception
-    assert any("Nivel educativo municipal" in node.value for node in app.markdown)
-    assert any("fuentes candidatas" in node.value for node in app.info)
-
-
-def test_map_indicator_year_survive_navigation(monkeypatch):
-    monkeypatch.setattr("map_view.st_folium", lambda *args, **kwargs: {})
-    app = AppTest.from_file("app.py", default_timeout=30).run()
-    app.button(key="nav_Mapa").click().run()
-    app.selectbox(key="map_indicator").set_value(POP).run()
-    app.selectbox(key=f"map_year_{POP}").set_value(2019).run()
-    app.button(key="nav_Explorar").click().run()
-    app.button(key="nav_Mapa").click().run()
-    assert not app.exception
-    assert app.selectbox(key="map_indicator").value == POP
-    assert app.selectbox(key=f"map_year_{POP}").value == 2019
 
 
 def test_comparison_search_surfaces_both_indicators():
@@ -148,9 +153,7 @@ def test_comparison_search_surfaces_both_indicators():
 
 
 def test_real_map_component_mounts():
-    app = AppTest.from_file("app.py", default_timeout=30).run()
-    app.button(key="nav_Mapa").click().run()
-    assert not app.exception
+    app = checked(AppTest.from_string("from explore_view import full_map\nfull_map()", default_timeout=45).run())
     assert app.get("component_instance")
     assert any("179 de 179" in message.value for message in app.caption)
 
@@ -160,27 +163,26 @@ def test_jenks_separates_natural_clusters_and_keeps_ties():
     assert classify(values, "Cortes naturales (Jenks)", count=3) == [1, 2, 81, 1001]
 
 
-def test_topic_card_starts_search_and_navigation_keeps_question(monkeypatch):
-    monkeypatch.setattr("explore_view.candidates", lambda _: ([], False))
-    app = AppTest.from_file("app.py", default_timeout=30).run()
-    app.button(key="topic_Vivienda").click().run()
-    assert not app.exception
-    assert "alquiler" in app.session_state.question
-    app.button(key="nav_Catálogo").click().run()
-    assert app.button(key="nav_Catálogo").proto.type == "primary"
-    app.button(key="nav_Explorar").click().run()
-    assert app.text_input(key="question_input").value == app.session_state.question
+def test_topic_card_opens_catalogue_and_selection_survives_home(monkeypatch):
+    monkeypatch.setattr("library_view.find_sources", lambda *args, **kwargs: ({"count": 0, "results": []}, False))
+    app = start()
+    press(app, "topic_Vivienda")
+    assert "alquiler" in app.text_input(key="catalog_keyword").value
+    assert app.button(key="nav_Datos").proto.type == "primary"
+    go(app, "Home")
+    go(app, "Datos")
+    assert "alquiler" in app.text_input(key="catalog_keyword").value
 
 
-def test_relationship_interpretation_and_metric_cards():
-    app = AppTest.from_file("app.py", default_timeout=30).run()
-    app.button(key="example_4").click().run()
-    assert not app.exception
+def test_relationship_interpretation_and_metric_cards_in_regression():
+    # This legacy renderer is tested directly and is not a route of the workbench.
+    app = checked(AppTest.from_string(
+        "from explore_view import relationship_report\nrelationship_report('regression')", default_timeout=45,
+    ).run())
     assert any("negativa muy débil" in node.value for node in app.markdown)
     metrics = {node.label: node.value for node in app.metric}
     assert metrics == {"Correlación de Pearson": "-0,109", "Municipios comparados": "179", "Año de referencia": "2024"}
-    assert app.button(key="relationship_1_Dispersión").proto.type == "primary"
-    app.button(key="relationship_1_Tabla").click().run()
-    assert not app.exception
-    assert app.button(key="relationship_1_Tabla").proto.type == "primary"
+    assert app.button(key="relationship_regression_Dispersión").proto.type == "primary"
+    press(app, "relationship_regression_Tabla")
+    assert app.button(key="relationship_regression_Tabla").proto.type == "primary"
     assert len(app.dataframe[0].value) == 179

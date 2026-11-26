@@ -4,10 +4,12 @@ import math
 import plotly.io as pio
 import streamlit as st
 
+from projects import project_key
+
 pio.templates.default = "plotly_dark"
 
 PAGES = {"Explorar": ":material/search:", "Mapa": ":material/map:",
-         "Analizar": ":material/analytics:", "Catálogo": ":material/folder_open:"}
+         "Analizar": ":material/analytics:", "Catálogo": ":material/folder_open:", "Mis proyectos": ":material/folder_copy:"}
 PERSISTENT_FILTERS = (
     "facet_", "filter_", "values_", "keys_a_", "keys_b_", "join_right_",
     "analysis_year_", "x_", "y_", "sel_", "studio_filter_", "studio_values_", "method_",
@@ -22,10 +24,16 @@ def navigate(page):
     st.session_state.page = page
 
 
+def home():
+    navigate("Explorar")
+    for key in ("question", "question_live", "open_demo", "question_input"):
+        st.session_state.pop(key, None)
+
+
 def navigation():
     # Reattach these widget values to the session before Streamlit cleans up the inactive page.
     for key in list(st.session_state):
-        if key in PERSISTENT_KEYS or key.startswith(PERSISTENT_FILTERS):
+        if key in PERSISTENT_KEYS or key.startswith(PERSISTENT_FILTERS) or project_key(key):
             st.session_state[key] = st.session_state[key]
     page = st.session_state.setdefault("page", "Explorar")
     with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center",
@@ -52,16 +60,30 @@ def navigation():
         </style>
         """)
         with st.container(horizontal=True, gap="small"):
+            st.button("Home", icon=":material/home:", type="tertiary", key="nav_Home", on_click=home)
             for name, icon in PAGES.items():
                 st.button(name, icon=icon, type="primary" if page == name else "tertiary",
                           key=f"nav_{name}", on_click=navigate, args=(name,))
     return page
 
 
-def metric_cards(cards):
+def validate_selection(key, options, *, multiple=False):
+    """Drop saved choices made invalid by a different filter or source."""
+    if key not in st.session_state:
+        return
+    current = st.session_state[key]
+    if multiple:
+        updated = [value for value in current if value in options] if isinstance(current, (list, tuple)) else []
+        if current != updated:
+            st.session_state[key] = updated
+    elif current not in options:
+        del st.session_state[key]
+
+
+def metric_cards(cards, *, width=190):
     with st.container(horizontal=True, gap="small"):
         for label, value, help_text in cards:
-            st.metric(label, value, help=help_text, border=True, width=190)
+            st.metric(label, value, help=help_text, border=True, width=width)
 
 
 def correlation_sentence(value):

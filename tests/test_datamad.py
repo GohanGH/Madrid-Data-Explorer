@@ -77,15 +77,23 @@ def test_official_analysis_reproduces_all_three_studies():
     health, *_ = prepare_study(DEMO_NAMES[2])
     jobs, *_ = prepare_study(DEMO_NAMES[1])
     signal = association(health, "Pearson", AGE_SHARE, RATE).table.iloc[0]
-    assert signal["Coeficiente"] == pytest.approx(.601, abs=.001)
+    assert signal["Coeficiente"] == pytest.approx(.600503, abs=1e-6)
     assert signal["IC 95 % inferior"] < signal["Coeficiente"] < signal["IC 95 % superior"]
     assert signal["Observaciones"] == 179
+    assert health["Centros de atención primaria (número)"].sum() == 422
+    assert association(health, "Spearman", AGE_SHARE, RATE).table["Coeficiente"].iat[0] == pytest.approx(.505204, abs=1e-6)
     y = "Renta per cápita (EUR)"
-    assert association(rent, "Spearman", AGE_SHARE, y).table["Observaciones"].iat[0] == 179
+    ranked = association(rent, "Spearman", AGE_SHARE, y).table
+    assert ranked["Observaciones"].iat[0] == 179
+    assert ranked["Coeficiente"].iat[0] == pytest.approx(-.151285, abs=1e-6)
     fit = regression(rent, "Lineal simple", y, [AGE_SHARE]).table.set_index("Variable")
     pearson = association(rent, "Pearson", AGE_SHARE, y).table["Coeficiente"].iat[0]
-    assert fit.loc[AGE_SHARE, "R²"] == pytest.approx(pearson ** 2)
+    assert pearson == pytest.approx(-.109310, abs=1e-6)
+    assert fit.loc[AGE_SHARE, "R²"] == pytest.approx(.011949, abs=1e-6)
+    assert len(jobs) == 1432
     ranking = employment(jobs, (2018, 2025)).set_index("INE")
+    assert ranking["2018"].sum() == 380051 and ranking["2025"].sum() == 293817
+    assert 100 * (ranking["2025"].sum() / ranking["2018"].sum() - 1) == pytest.approx(-22.69, abs=.005)
     assert ranking.at["28092", ABS] == -4323
     assert ranking.at["28092", PCT] == pytest.approx(100 * ranking.at["28092", ABS] / ranking.at["28092", "2018"])
     result = temporal(jobs[jobs["INE"].eq("28092")], "Año", jobs.columns[3], "Año", "Territorio")
@@ -110,8 +118,11 @@ def test_study_report_follows_changes_in_filters_and_keeps_charts_offline(monkey
 
     monkeypatch.setattr(demos, "html_report", capture)
     monkeypatch.setattr(st, "download_button", request_report)
-    app = AppTest.from_file("app.py", default_timeout=45).run()
-    app.button(key="open_1").click().run()
+    # The historical study view is exercised in isolation. It is never routed by the application.
+    app = AppTest.from_string(
+        f"from demos import render_study\nrender_study({DEMO_NAMES[1]!r}, lambda *args, **kwargs: None)",
+        default_timeout=55,
+    ).run()
     assert not app.exception
     app.select_slider(key="demo_1_years").set_value((2020, 2024)).run()
     assert not app.exception

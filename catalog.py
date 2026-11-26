@@ -53,6 +53,8 @@ def search_catalog(query, rows=25):
 
 
 def official_url(url):
+    if not isinstance(url, str):
+        return False
     try:
         parsed = urlparse(url)
         host = parsed.hostname or ""
@@ -70,7 +72,7 @@ def compatible_resources(dataset):
             and official_url(str(r.get("url", "")))]
 
 
-def download_table(resource):
+def download_resource(resource):
     url = str(resource.get("url", ""))
     deadline = monotonic() + 45
     with _session() as session:
@@ -93,5 +95,9 @@ def download_table(resource):
                     data.extend(chunk)
                     if len(data) > MAX_BYTES:
                         raise ValueError("El fichero supera 15 MB.")
-                return read_table(bytes(data), str(resource.get("format", "")))
+                return bytes(data)
     raise ValueError("Demasiadas redirecciones al cargar el recurso.")
+
+
+def download_table(resource):
+    return read_table(download_resource(resource), str(resource.get("format", "")))

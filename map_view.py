@@ -153,8 +153,8 @@ def build_map(features, bins, palette, unit):
 
 
 def export_chart(figure, key, *, label="Descargar gráfico (HTML)"):
-    st.download_button(label, figure.to_html(include_plotlyjs=True),
-                       file_name="madrid-grafico.html", mime="text/html", key=f"chart_{key}")
+    st.download_button(label, lambda: figure.to_html(include_plotlyjs=True),
+                       file_name="madrid-grafico.html", mime="text/html", key=f"chart_{key}", on_click="ignore")
 
 
 def remembered_choice(widget, label, options, key, *, index=0, **kwargs):
@@ -241,8 +241,8 @@ def linked_map(frame, *, title, unit, key, history=None, reference=None, source=
             st.caption(f"Comunidad de Madrid (dato oficial): {value_text(reference, unit)}.")
         st.download_button("Descargar datos del mapa", csv_export(frame), file_name="madrid-mapa.csv",
                            mime="text/csv", key=f"map_csv_{key}")
-        st.download_button("Descargar mapa interactivo (HTML)", map_.get_root().render(),
-                           file_name="madrid-mapa.html", mime="text/html", key=f"map_html_{key}")
+        st.download_button("Descargar mapa interactivo (HTML)", lambda: build_map(features, bins, palette, unit).get_root().render(),
+                           file_name="madrid-mapa.html", mime="text/html", key=f"map_html_{key}", on_click="ignore")
     if not selected:
         return
     data = frame.assign(Posición=pd.to_numeric(frame["Valor"], errors="coerce").rank(ascending=False, method="min"))

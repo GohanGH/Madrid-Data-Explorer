@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from streamlit.testing.v1 import AppTest
+from workbench_helpers import analysis_method, go, press, set_widget, start, submit
 
 from map_view import synced_view
 from profiling import corrected, schema
@@ -104,23 +104,20 @@ def test_time_and_report_export():
 
 
 def test_studio_profiles_applies_and_undoes_with_real_widgets():
-    app = AppTest.from_file("app.py", default_timeout=40).run()
+    app = start()
     frame = pd.DataFrame({"Año": ["2020", "2021"], "Valor": [1, 3]})
     app.session_state.tables[1] = {"df": frame, "title": "Datos", "sources": ("Prueba",), "history": ()}
     app.session_state.serial = 1
-    app.button(key="nav_Analizar").click().run()
-    assert not app.exception
+    go(app, "Preparación")
+    set_widget(app, "radio", "prep_section", "Diagnóstico y limpieza")
     assert app.session_state.tables[1]["profile"]["rows"] == 2
-    app.radio(key="studio_view").set_value("Limpieza recomendada").run()
-    app.button(key="apply_1_0").click().run()
-    assert not app.exception
+    press(app, "apply_1_0")
     assert app.session_state.tables[2]["df"]["Año"].tolist() == [2020, 2021]
     assert app.session_state.tables[1]["df"]["Año"].tolist() == ["2020", "2021"]
-    next(button for button in app.button if button.label == "Deshacer esta versión").click().run()
-    assert set(app.session_state.tables) == {1}
-    app.radio(key="studio_view").set_value("Análisis disponibles").run()
-    app.button(key="execute_1_Distribución").click().run()
-    assert not app.exception
+    press(app, "prep_undo")
+    assert app.session_state.tables[2]["archived"]
+    analysis_method(app, 1, "Descriptivos", "Distribución")
+    press(app, "execute_1_Distribución")
     assert any("mediana" in node.value for node in app.markdown)
 
 
@@ -147,14 +144,12 @@ def test_studio_ranks_geographic_data_and_mounts_two_linked_maps(monkeypatch):
         maps.append(kwargs)
         return {}
     monkeypatch.setattr("map_view.st_folium", fake_map)
-    app = AppTest.from_file("app.py", default_timeout=45).run()
+    app = start()
     frame = pd.DataFrame({"Código territorio": ["0650", "0796"], "medida A": [4, 6], "medida B": [12, 14]})
     app.session_state.tables[1] = {"df": frame, "title": "Datos", "sources": ("Prueba",), "history": ()}
-    app.button(key="nav_Analizar").click().run()
-    app.radio(key="studio_view").set_value("Análisis disponibles").run()
-    app.button(key="family_1_Análisis geográfico").click().run()
-    app.multiselect(key="geo_metrics_1").set_value(["medida A", "medida B"]).run()
-    assert not app.exception
+    analysis_method(app, 1, "Análisis geográfico", "Comparación municipal")
+    maps.clear()
+    set_widget(app, "multiselect", "geo_metrics_1", ["medida A", "medida B"])
     assert len(maps) == 2 and all("zoom" in m["returned_objects"] for m in maps)
     assert app.dataframe[-1].value["medida B"].tolist() == [14, 12]
 
@@ -162,15 +157,14 @@ def test_studio_ranks_geographic_data_and_mounts_two_linked_maps(monkeypatch):
 def test_catalog_resource_opens_profile_with_detected_schema(monkeypatch):
     dataset = {"name": "datos-prueba", "id": "test-3", "title": "Indicador de prueba", "notes": "Descripción",
                "resources": [{"name": "Tabla", "format": "CSV", "url": "https://datos.comunidad.madrid/prueba.csv"}]}
-    monkeypatch.setattr("catalog.catalog_page", lambda *args, **kwargs: {"count": 1, "results": [dataset]})
-    monkeypatch.setattr("catalog.download_table", lambda _: pd.DataFrame({"Año": [2023, 2024], "Valor": [3, 5]}))
-    app = AppTest.from_file("app.py", default_timeout=45).run()
-    app.button(key="nav_Catálogo").click().run()
-    app.text_input(key="explorer_query").set_value("prueba v3")
-    next(w for w in app.button if w.label == "Buscar datasets").click().run()
-    app.multiselect(key="sel_test-3").set_value([0]).run()
-    app.button(key="catalog_Explorar este dataset_test-3").click().run()
-    assert not app.exception
-    assert app.session_state.page == "Analizar"
+    monkeypatch.setattr("library_view.find_sources", lambda *args, **kwargs: ({"count": 1, "results": [dataset]}, False))
+    monkeypatch.setattr("library_view.download_resource", lambda _: "Año,Valor\n2023,3\n2024,5\n".encode())
+    app = start()
+    go(app, "Datos")
+    set_widget(app, "text_input", "catalog_keyword", "prueba", rerun=False)
+    submit(app, "Buscar")
+    press(app, "catalog_open_test-3")
+    assert app.session_state.page == "Datos"
+    assert app.session_state.data_section == "Biblioteca"
     assert app.session_state.tables[1]["profile"]["variables"][0]["Rol"] == "Año"
     assert app.session_state.tables[1]["metadata"]["formato"] == "CSV"
