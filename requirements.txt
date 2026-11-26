@@ -1,5 +1,6 @@
 streamlit==1.52.2
 pandas==2.3.3
+numpy
 requests==2.34.2
 plotly==6.9.0
 openai==2.54.0

@@ -22,7 +22,7 @@
 
 ### Compatibilidad, dependencias y límites
 
-- Continúan Python 3.11 como referencia y `app.py` como entrada. Los requisitos de ejecución y desarrollo se conservan.
+- Continúan Python 3.11 como referencia y `app.py` como entrada. NumPy se declara como dependencia directa de los módulos de análisis y visualización.
 - Los accesos predeterminados de 3.1 salen de la navegación. El lector 4.0 abre los proyectos ZIP v1 y guarda en formato v2. Para compartir archivos v2, ambos miembros del equipo necesitan 4.0.
 - El PDF se obtiene al imprimir el HTML en el navegador. LISA, Moran local, regresión binomial negativa y clustering quedan pendientes. Las revisiones identifican resultados históricos y se recalculan de forma explícita. [Arquitectura y límites](docs/MDE_4.md) · [Validación](docs/VALIDACION_FINAL.md)
 
